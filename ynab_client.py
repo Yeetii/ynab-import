@@ -56,6 +56,31 @@ class YnabClient:
         self._raise(resp)
         return resp.json()["data"]
 
+    def get_account(self, account_id: str) -> dict:
+        resp = self._session.get(self._url(f"budgets/{self._budget_id}/accounts/{account_id}"))
+        self._raise(resp)
+        return resp.json()["data"]["account"]
+
+    def reconcile(self, account_id: str) -> int:
+        """Mark all cleared transactions on account as reconciled. Returns count updated."""
+        payload = {"transaction": {"cleared": "reconciled"}}
+        # YNAB supports bulk-updating by filter via account transactions bulk patch
+        # We fetch cleared (unreconciled) tx ids and patch them
+        resp = self._session.get(
+            self._url(f"budgets/{self._budget_id}/accounts/{account_id}/transactions"),
+        )
+        self._raise(resp)
+        cleared_ids = [
+            tx["id"] for tx in resp.json()["data"]["transactions"]
+            if tx.get("cleared") == "cleared" and not tx.get("deleted")
+        ]
+        if not cleared_ids:
+            return 0
+        bulk = {"transactions": [{"id": tx_id, "cleared": "reconciled"} for tx_id in cleared_ids]}
+        resp = self._session.patch(self._url(f"budgets/{self._budget_id}/transactions"), json=bulk)
+        self._raise(resp)
+        return len(cleared_ids)
+
     def match_transaction(self, ynab_tx_id: str, import_id: str) -> dict:
         """Link a manually-entered YNAB transaction to a bank import by setting import_id."""
         payload = {
