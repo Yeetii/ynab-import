@@ -1,0 +1,6 @@
+pandas
+openpyxl
+requests
+rapidfuzz
+rich
+python-dotenv
