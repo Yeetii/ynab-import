@@ -4,3 +4,4 @@ requests
 rapidfuzz
 rich
 python-dotenv
+pytest

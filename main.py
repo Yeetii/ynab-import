@@ -86,30 +86,29 @@ def apply_results(client: YnabClient, account_id: str, results: list[MatchResult
     matches = [r for r in results if r.action == "match"]
     creates = [r for r in results if r.action == "create"]
 
-    if matches:
-        console.print(f"\nMatching {len(matches)} transaction(s)...")
-        for r in matches:
-            assert r.ynab_tx is not None
-            try:
-                client.match_transaction(r.ynab_tx["id"], r.bank_tx.import_id)
-                console.print(f"  [green]✓[/green] Matched {r.bank_tx.date} {format_amount(r.bank_tx.amount_milliunits)} → {r.ynab_tx.get('payee_name')}")
-            except Exception as e:
-                console.print(f"  [red]✗[/red] Failed to match {r.bank_tx.import_id}: {e}")
-
-    if creates:
-        console.print(f"\nCreating {len(creates)} transaction(s)...")
-        # Chunk into batches of 1000 (YNAB limit)
+    # Matches and creates both go through create_transactions.
+    # YNAB auto-links imported transactions (via import_id) to existing manual
+    # transactions with the same amount/date, creating the matched_transaction_id
+    # chain exactly like YNAB's own bank sync does. This also corrects amounts.
+    all_to_import = matches + creates
+    if all_to_import:
+        label = []
+        if matches:
+            label.append(f"matching {len(matches)}")
+        if creates:
+            label.append(f"creating {len(creates)}")
+        console.print(f"\nImporting ({', '.join(label)}) transaction(s)...")
         chunk_size = 1000
-        for i in range(0, len(creates), chunk_size):
-            chunk = creates[i : i + chunk_size]
+        for i in range(0, len(all_to_import), chunk_size):
+            chunk = all_to_import[i : i + chunk_size]
             txns = [r.bank_tx for r in chunk]
             try:
                 result = client.create_transactions(account_id, txns)
                 dups = result.get("duplicate_import_ids", [])
                 created_count = len(result.get("transaction_ids", []))
-                console.print(f"  [green]✓[/green] Created {created_count} transaction(s)" + (f", {len(dups)} duplicate(s) skipped" if dups else ""))
+                console.print(f"  [green]✓[/green] Imported {created_count} transaction(s)" + (f", {len(dups)} duplicate(s) skipped" if dups else ""))
             except Exception as e:
-                console.print(f"  [red]✗[/red] Failed to create batch: {e}")
+                console.print(f"  [red]✗[/red] Failed to import batch: {e}")
 
 
 def main() -> None:
