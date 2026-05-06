@@ -2,6 +2,7 @@
 """YNAB Bank Import Tool
 
 Usage:
+    python main.py --file march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
     python main.py --bank handelsbanken --file march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
     python main.py --bank spendwise --file march.xlsx [--dry-run]
 """
@@ -118,10 +119,18 @@ def apply_results(client: YnabClient, account_id: str, results: list[MatchResult
                 console.print(f"  [red]✗[/red] Failed to import batch: {e}")
 
 
+def detect_bank(filepath: Path) -> str | None:
+    """Return the bank key whose adapter recognises filepath, or None."""
+    for name, adapter_cls in ADAPTERS.items():
+        if hasattr(adapter_cls, "detect") and adapter_cls.detect(filepath):
+            return name
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import bank transactions into YNAB")
-    parser.add_argument("--bank", required=True, choices=list(ADAPTERS), help="Bank adapter to use")
-    parser.add_argument("--file", required=True, type=Path, help="Path to export file (XLSX or CSV)")
+    parser.add_argument("--bank", choices=list(ADAPTERS), help="Bank adapter to use (auto-detected if omitted)")
+    parser.add_argument("file", type=Path, help="Path to export file (XLSX or CSV)")
     parser.add_argument("--dry-run", action="store_true", help="Parse and match but do not write to YNAB")
     parser.add_argument("--since", type=date.fromisoformat, help="Only import transactions on/after this date (YYYY-MM-DD)")
     parser.add_argument("--auto-confirm", action="store_true", help="Skip confirmation prompt")
@@ -132,13 +141,24 @@ def main() -> None:
         console.print(f"[red]File not found:[/red] {filepath}")
         sys.exit(1)
 
+    if args.bank:
+        bank = args.bank
+        console.print(f"Bank: [bold]{bank}[/bold]")
+    else:
+        bank = detect_bank(filepath)
+        if bank is None:
+            console.print("[red]Could not auto-detect bank format. Use --bank to specify.[/red]")
+            sys.exit(1)
+        console.print(f"Bank: [bold]{bank}[/bold] [dim](auto-detected)[/dim]")
+    args.bank = bank
+
     account_id = config.ACCOUNT_IDS.get(args.bank)
     if not account_id:
         console.print(f"[red]No YNAB account ID configured for '{args.bank}'. Set YNAB_ACCOUNT_{args.bank.upper()} in .env[/red]")
         sys.exit(1)
 
     # Parse bank file
-    console.print(f"Parsing [bold]{filepath.name}[/bold] with {args.bank} adapter...")
+    console.print(f"Parsing [bold]{filepath.name}[/bold]...")
     adapter = ADAPTERS[args.bank]()
     bank_txns = adapter.parse(filepath)
 

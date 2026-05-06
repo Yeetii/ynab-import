@@ -62,6 +62,19 @@ def parse_balance(filepath: Path, reference_date: date | None = None) -> int | N
 
 
 class SpendwiseAdapter(BaseAdapter):
+    @staticmethod
+    def detect(filepath: Path) -> bool:
+        """Return True if filepath looks like a Spendwise export."""
+        try:
+            raw = pd.read_excel(filepath, header=None, dtype=str, nrows=5)
+            for _, row in raw.iterrows():
+                for cell in row:
+                    if pd.notna(cell) and re.search(r"Transaktionsexport", str(cell), re.I):
+                        return True
+        except Exception:
+            pass
+        return False
+
     def parse(self, filepath: Path) -> list[Transaction]:
         df = load_df(filepath, _DATE_PAT)
         df.columns = [c.strip() for c in df.columns]

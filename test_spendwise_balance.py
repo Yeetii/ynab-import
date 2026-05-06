@@ -98,8 +98,8 @@ class TestParseBalance:
     def test_excludes_betalt_payment_rows(self, make_xlsx):
         rows = [
             _tx("2026-04-30", "2026-04-30", "BETALT BG DATUM 260430", "-16762.39"),
-            _tx("2026-04-15", "2026-04-16", "ICA SUPERMARKET", "531.58"),
-            _tx("2026-05-03", "2026-05-04", "COOP", "178.8"),
+            _tx("2026-04-15", "2026-04-16", "GROCERY STORE A", "531.58"),
+            _tx("2026-05-03", "2026-05-04", "GROCERY STORE B", "178.8"),
         ]
         p = make_xlsx(rows)
         expected = -round((531.58 + 178.8) * 1000)
@@ -121,9 +121,9 @@ class TestParseBalance:
     def test_march31_transaction_booked_april1_is_included(self, make_xlsx):
         """Transaction dated March 31 but booked April 1 counts in April cycle."""
         rows = [
-            _tx("2026-03-31", "2026-04-01", "APPLE.COM/BILL", "9"),
-            _tx("2026-04-15", "2026-04-16", "ICA", "100"),
-            _tx("2026-05-01", "2026-05-02", "COOP", "50"),
+            _tx("2026-03-31", "2026-04-01", "SUBSCRIPTION A", "9"),
+            _tx("2026-04-15", "2026-04-16", "GROCERY STORE A", "100"),
+            _tx("2026-05-01", "2026-05-02", "GROCERY STORE B", "50"),
         ]
         p = make_xlsx(rows)
         assert parse_balance(p) == -159_000
@@ -131,9 +131,9 @@ class TestParseBalance:
     def test_march31_transaction_booked_march31_is_excluded(self, make_xlsx):
         """Transaction dated and booked March 31 is outside the April-May window."""
         rows = [
-            _tx("2026-03-31", "2026-03-31", "DELECTOR AB", "149"),
-            _tx("2026-04-15", "2026-04-16", "ICA", "100"),
-            _tx("2026-05-01", "2026-05-02", "COOP", "50"),
+            _tx("2026-03-31", "2026-03-31", "RETAILER A", "149"),
+            _tx("2026-04-15", "2026-04-16", "GROCERY STORE A", "100"),
+            _tx("2026-05-01", "2026-05-02", "GROCERY STORE B", "50"),
         ]
         p = make_xlsx(rows)
         assert parse_balance(p) == -150_000
@@ -146,10 +146,10 @@ class TestParseBalance:
         ws.append([None] * 7)
         ws.append(["Totalt övriga händelser"] + [None] * 6)
         ws.append(_COLUMNS)
-        ws.append(_tx("2026-04-10", "2026-04-11", "GITHUB, INC.", "21.59", "USD"))
+        ws.append(_tx("2026-04-10", "2026-04-11", "SUBSCRIPTION B", "21.59", "USD"))
         # Currency rate note row
         ws.append(["Valutakurs: 9.725225 Valutapåslag ingår med 2,00 %"] + [None] * 6)
-        ws.append(_tx("2026-05-01", "2026-05-02", "COOP", "100"))
+        ws.append(_tx("2026-05-01", "2026-05-02", "GROCERY STORE A", "100"))
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -193,70 +193,70 @@ class TestParseBalance:
         """
         rows = [
             # March 31, booked April 1 → INCLUDED
-            _tx("2026-03-31", "2026-04-01", "APPLE.COM/BILL", "9"),
+            _tx("2026-03-31", "2026-04-01", "SUBSCRIPTION A", "9"),
             # March 31, booked March 31 → EXCLUDED (prior billing cycle)
-            _tx("2026-03-31", "2026-03-31", "DELECTOR AB", "149"),
+            _tx("2026-03-31", "2026-03-31", "RETAILER A", "149"),
             # April payment → EXCLUDED
             _tx("2026-04-30", "2026-04-30", "BETALT BG DATUM 260430", "-16762.39"),
             # April charges
-            _tx("2026-04-01", "2026-04-02", "GOOGLE*CLOUD GV8ZB8", "2.53"),
-            _tx("2026-04-04", "2026-04-07", "SJ AB OMBORD", "122"),
-            _tx("2026-04-04", "2026-04-07", "SJ.SE", "1476"),
-            _tx("2026-04-05", "2026-04-07", "GITHUB, INC.", "21.59"),
-            _tx("2026-04-05", "2026-04-07", "SJ AB OMBORD", "28"),
-            _tx("2026-04-05", "2026-04-07", "SJ AB OMBORD", "69"),
-            _tx("2026-04-05", "2026-04-07", "PRESSBYRAN NAESSJOE JV", "26"),
-            _tx("2026-04-07", "2026-04-07", "KLARNA* SKISTAR.COM", "671"),
-            _tx("2026-04-08", "2026-04-09", "WIKIMEDIA", "50"),
-            _tx("2026-04-09", "2026-04-10", "GITHUB, INC.", "90.42"),
-            _tx("2026-04-09", "2026-04-10", "MICROSOFTÄG151779359", "178.6"),
-            _tx("2026-04-09", "2026-04-09", "GITHUB, INC.", "262.35"),
-            _tx("2026-04-10", "2026-04-13", "A043 DK CPH UNION KITC", "281.98"),
-            _tx("2026-04-10", "2026-04-13", "VT 86 PRAGUE AIRPORT", "68.87"),
-            _tx("2026-04-10", "2026-04-13", "LETISTE V.H. T2 LAND.A", "22.5"),
-            _tx("2026-04-10", "2026-04-13", "GEBR. HEINEMANN", "39.54"),
-            _tx("2026-04-11", "2026-04-13", "PARKING PRO SRO", "45.94"),
-            _tx("2026-04-12", "2026-04-13", "T2_TERASA 62280", "73.04"),
-            _tx("2026-04-12", "2026-04-13", "ARLANDA EXPRESS", "340"),
-            _tx("2026-04-12", "2026-04-13", "PARKOVISTE MESTYSE", "45.94"),
-            _tx("2026-04-12", "2026-04-13", "ORLEN CS 0284", "632.89"),
-            _tx("2026-04-12", "2026-04-13", "LIDL DEKUJE ZA NAKUP", "73.13"),
-            _tx("2026-04-12", "2026-04-13", "RENT PLUS S.R.O.", "352.59"),
-            _tx("2026-04-12", "2026-04-13", "PARKOVISTE NH HOTELY", "725.82"),
-            _tx("2026-04-12", "2026-04-13", "JESO TRANSLATIONS S.R.", "140.11"),
-            _tx("2026-04-13", "2026-04-14", "7-ELEVEN SVEAVAEGEN 55", "96"),
-            _tx("2026-04-13", "2026-04-14", "WEIDAO", "170"),
-            _tx("2026-04-13", "2026-04-14", "KUNGSBILJARDEN", "49"),
-            _tx("2026-04-14", "2026-04-15", "A148 SE STO STARBUCKS", "119"),
-            _tx("2026-04-14", "2026-04-15", "ZETTLE_*VR SVERIGE AB", "124"),
-            _tx("2026-04-14", "2026-04-15", "ZETTLE_*VR SVERIGE AB", "14.5"),
-            _tx("2026-04-15", "2026-04-16", "TRADERA", "366"),
-            _tx("2026-04-16", "2026-04-17", "APPLE.COM/BILL", "30"),
-            _tx("2026-04-16", "2026-04-17", "SJ APP", "145"),
-            _tx("2026-04-16", "2026-04-17", "ICA SUPERMARKET ARE", "304.11"),
-            _tx("2026-04-18", "2026-04-20", "GARMIN", "110"),
-            _tx("2026-04-20", "2026-04-22", "ICA SUPERMARKET ARE", "531.58"),
-            _tx("2026-04-20", "2026-04-22", "AIMO, AIMO PARK", "5"),
-            _tx("2026-04-21", "2026-04-22", "ARE BAGERI & RESTAURAN", "404"),
-            _tx("2026-04-21", "2026-04-22", "ICA SUPERMARKET ARE", "120.04"),
-            _tx("2026-04-23", "2026-04-24", "CURSOR, AI POWERED IDE", "239.45"),
-            _tx("2026-04-23", "2026-04-23", "APPLE.COM/BILL", "12"),
-            _tx("2026-04-25", "2026-04-27", "TICKSTER.COM", "395"),
-            _tx("2026-04-25", "2026-04-27", "MAXI ICA STORMARKNAD O", "209.43"),
-            _tx("2026-04-26", "2026-04-27", "COOP ARE", "369.29"),
-            _tx("2026-04-27", "2026-04-29", "COOP ARE", "360.44"),
-            _tx("2026-04-28", "2026-04-29", "DELECTOR AB", "149"),
+            _tx("2026-04-01", "2026-04-02", "CLOUD SERVICE A", "2.53"),
+            _tx("2026-04-04", "2026-04-07", "TRANSIT MERCHANT A", "122"),
+            _tx("2026-04-04", "2026-04-07", "TRANSIT MERCHANT B", "1476"),
+            _tx("2026-04-05", "2026-04-07", "SUBSCRIPTION B", "21.59"),
+            _tx("2026-04-05", "2026-04-07", "TRANSIT MERCHANT A", "28"),
+            _tx("2026-04-05", "2026-04-07", "TRANSIT MERCHANT A", "69"),
+            _tx("2026-04-05", "2026-04-07", "KIOSK A", "26"),
+            _tx("2026-04-07", "2026-04-07", "ONLINE RETAILER A", "671"),
+            _tx("2026-04-08", "2026-04-09", "DONATION A", "50"),
+            _tx("2026-04-09", "2026-04-10", "SUBSCRIPTION B", "90.42"),
+            _tx("2026-04-09", "2026-04-10", "SUBSCRIPTION C", "178.6"),
+            _tx("2026-04-09", "2026-04-09", "SUBSCRIPTION B", "262.35"),
+            _tx("2026-04-10", "2026-04-13", "RESTAURANT A", "281.98"),
+            _tx("2026-04-10", "2026-04-13", "TRAVEL MERCHANT A", "68.87"),
+            _tx("2026-04-10", "2026-04-13", "TRAVEL MERCHANT B", "22.5"),
+            _tx("2026-04-10", "2026-04-13", "TRAVEL RETAILER A", "39.54"),
+            _tx("2026-04-11", "2026-04-13", "PARKING A", "45.94"),
+            _tx("2026-04-12", "2026-04-13", "RESTAURANT B", "73.04"),
+            _tx("2026-04-12", "2026-04-13", "TRANSIT MERCHANT C", "340"),
+            _tx("2026-04-12", "2026-04-13", "PARKING B", "45.94"),
+            _tx("2026-04-12", "2026-04-13", "FUEL STATION A", "632.89"),
+            _tx("2026-04-12", "2026-04-13", "GROCERY STORE A", "73.13"),
+            _tx("2026-04-12", "2026-04-13", "RENTAL SERVICE A", "352.59"),
+            _tx("2026-04-12", "2026-04-13", "PARKING C", "725.82"),
+            _tx("2026-04-12", "2026-04-13", "SERVICE PROVIDER A", "140.11"),
+            _tx("2026-04-13", "2026-04-14", "CONVENIENCE STORE A", "96"),
+            _tx("2026-04-13", "2026-04-14", "RESTAURANT C", "170"),
+            _tx("2026-04-13", "2026-04-14", "ENTERTAINMENT A", "49"),
+            _tx("2026-04-14", "2026-04-15", "COFFEE SHOP A", "119"),
+            _tx("2026-04-14", "2026-04-15", "RETAIL SHOP A", "124"),
+            _tx("2026-04-14", "2026-04-15", "RETAIL SHOP A", "14.5"),
+            _tx("2026-04-15", "2026-04-16", "ONLINE MARKETPLACE A", "366"),
+            _tx("2026-04-16", "2026-04-17", "SUBSCRIPTION A", "30"),
+            _tx("2026-04-16", "2026-04-17", "TRANSIT MERCHANT D", "145"),
+            _tx("2026-04-16", "2026-04-17", "GROCERY STORE B", "304.11"),
+            _tx("2026-04-18", "2026-04-20", "ELECTRONICS A", "110"),
+            _tx("2026-04-20", "2026-04-22", "GROCERY STORE B", "531.58"),
+            _tx("2026-04-20", "2026-04-22", "PARKING D", "5"),
+            _tx("2026-04-21", "2026-04-22", "BAKERY A", "404"),
+            _tx("2026-04-21", "2026-04-22", "GROCERY STORE B", "120.04"),
+            _tx("2026-04-23", "2026-04-24", "SUBSCRIPTION D", "239.45"),
+            _tx("2026-04-23", "2026-04-23", "SUBSCRIPTION A", "12"),
+            _tx("2026-04-25", "2026-04-27", "TICKET SERVICE A", "395"),
+            _tx("2026-04-25", "2026-04-27", "GROCERY STORE C", "209.43"),
+            _tx("2026-04-26", "2026-04-27", "GROCERY STORE D", "369.29"),
+            _tx("2026-04-27", "2026-04-29", "GROCERY STORE D", "360.44"),
+            _tx("2026-04-28", "2026-04-29", "RETAILER A", "149"),
             # Dated April 30 but booked May 4 → INCLUDED (in May window)
-            _tx("2026-04-30", "2026-05-04", "ARE SKIDSPORT A", "1704"),
+            _tx("2026-04-30", "2026-05-04", "SPORTS RETAILER A", "1704"),
             # May charges
-            _tx("2026-05-01", "2026-05-04", "GOOGLE CLOUD 2HG52J", "2.44"),
-            _tx("2026-05-01", "2026-05-04", "HOLIDAY CLUB", "124"),
-            _tx("2026-05-01", "2026-05-04", "HOLIDAY CLUB", "69"),
-            _tx("2026-05-01", "2026-05-04", "MAXI ICA STORMARKNAD O", "201.73"),
-            _tx("2026-05-02", "2026-05-04", "GS AARE BILTVATT", "299"),
-            _tx("2026-05-03", "2026-05-04", "SURF*WERSNS", "501.9"),
-            _tx("2026-05-03", "2026-05-04", "COOP ARE", "178.8"),
-            _tx("2026-05-05", "2026-05-06", "MISTRAL.AI", "146.94"),
+            _tx("2026-05-01", "2026-05-04", "CLOUD SERVICE B", "2.44"),
+            _tx("2026-05-01", "2026-05-04", "ACCOMMODATION A", "124"),
+            _tx("2026-05-01", "2026-05-04", "ACCOMMODATION A", "69"),
+            _tx("2026-05-01", "2026-05-04", "GROCERY STORE C", "201.73"),
+            _tx("2026-05-02", "2026-05-04", "CAR WASH A", "299"),
+            _tx("2026-05-03", "2026-05-04", "ONLINE SERVICE A", "501.9"),
+            _tx("2026-05-03", "2026-05-04", "GROCERY STORE D", "178.8"),
+            _tx("2026-05-05", "2026-05-06", "SUBSCRIPTION E", "146.94"),
         ]
         p = make_xlsx(rows)
         assert parse_balance(p) == -13_399_490
