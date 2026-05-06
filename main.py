@@ -15,8 +15,10 @@ from rich.table import Table
 
 import config
 import matcher as match_module
-from adapters.handelsbanken import HandelsbankenAdapter, parse_balance
+from adapters.handelsbanken import HandelsbankenAdapter
+from adapters.handelsbanken import parse_balance as hb_parse_balance
 from adapters.spendwise import SpendwiseAdapter
+from adapters.spendwise import parse_balance as sw_parse_balance
 from models import MatchResult
 from ynab_client import YnabClient
 
@@ -25,6 +27,11 @@ console = Console()
 ADAPTERS = {
     "handelsbanken": HandelsbankenAdapter,
     "spendwise": SpendwiseAdapter,
+}
+
+BALANCE_PARSERS = {
+    "handelsbanken": hb_parse_balance,
+    "spendwise": sw_parse_balance,
 }
 
 ACTION_STYLES = {
@@ -185,25 +192,40 @@ def main() -> None:
     apply_results(client, account_id, results)
     console.print("\n[green]Done.[/green]")
 
-    # Reconciliation (Handelsbanken only): if file balance matches YNAB cleared balance
+    try:
+        account = client.get_account(account_id)
+        ynab_cleared = account["cleared_balance"]  # milliunits
+    except Exception as e:
+        console.print(f"[yellow]Could not fetch account balance: {e}[/yellow]")
+        return
+
+    # Balance check
+    file_balance: int | None = None
+    if args.bank in BALANCE_PARSERS:
+        file_balance = BALANCE_PARSERS[args.bank](filepath)
+
+    if file_balance is not None:
+        diff_sek = abs(file_balance - ynab_cleared) / 1000
+        console.print(
+            f"\nBalance check: file={file_balance/1000:.2f} SEK, "
+            f"YNAB cleared={ynab_cleared/1000:.2f} SEK, diff={diff_sek:.2f} SEK"
+        )
+    else:
+        console.print(f"\nYNAB cleared balance: {ynab_cleared/1000:.2f} SEK")
+
+    # Reconciliation: if file balance matches YNAB cleared balance
     # within 150 SEK, mark all cleared transactions as reconciled.
-    if args.bank == "handelsbanken":
-        file_balance = parse_balance(filepath)
-        if file_balance is not None:
-            account = client.get_account(account_id)
-            ynab_cleared = account["cleared_balance"]  # milliunits
-            diff_sek = abs(file_balance - ynab_cleared) / 1000
-            console.print(f"\nBalance check: file={file_balance/1000:.2f} SEK, YNAB cleared={ynab_cleared/1000:.2f} SEK, diff={diff_sek:.2f} SEK")
-            if diff_sek <= 150:
-                if not args.auto_confirm:
-                    answer = console.input(f"Reconcile account (diff {diff_sek:.2f} SEK ≤ 150)? [y/N] ").strip().lower()
-                    if answer != "y":
-                        console.print("[dim]Reconciliation skipped.[/dim]")
-                        return
-                count = client.reconcile(account_id)
-                console.print(f"[green]✓[/green] Reconciled {count} transaction(s).")
-            else:
-                console.print(f"[yellow]Skipping reconciliation — difference {diff_sek:.2f} SEK exceeds 150 SEK.[/yellow]")
+    if file_balance is not None:
+        if diff_sek <= 150:
+            if not args.auto_confirm:
+                answer = console.input(f"Reconcile account (diff {diff_sek:.2f} SEK ≤ 150)? [y/N] ").strip().lower()
+                if answer != "y":
+                    console.print("[dim]Reconciliation skipped.[/dim]")
+                    return
+            count = client.reconcile(account_id)
+            console.print(f"[green]✓[/green] Reconciled {count} transaction(s).")
+        else:
+            console.print(f"[yellow]Skipping reconciliation — difference {diff_sek:.2f} SEK exceeds 150 SEK.[/yellow]")
 
 
 if __name__ == "__main__":
