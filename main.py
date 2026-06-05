@@ -2,9 +2,9 @@
 """YNAB Bank Import Tool
 
 Usage:
-    python main.py --file march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
-    python main.py --bank handelsbanken --file march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
-    python main.py --bank spendwise --file march.xlsx [--dry-run]
+    python main.py march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
+    python main.py --bank handelsbanken march.xlsx [--dry-run] [--since 2026-01-01] [--auto-confirm]
+    python main.py --bank spendwise march.xlsx [--dry-run]
 """
 import argparse
 import sys
@@ -230,12 +230,8 @@ def main() -> None:
             f"\nBalance check: file={file_balance/1000:.2f} SEK, "
             f"YNAB cleared={ynab_cleared/1000:.2f} SEK, diff={diff_sek:.2f} SEK"
         )
-    else:
-        console.print(f"\nYNAB cleared balance: {ynab_cleared/1000:.2f} SEK")
-
-    # Reconciliation: if file balance matches YNAB cleared balance
-    # within 150 SEK, mark all cleared transactions as reconciled.
-    if file_balance is not None:
+        # Reconciliation: if file balance matches YNAB cleared balance
+        # within 150 SEK, mark all cleared transactions as reconciled.
         if diff_sek <= 150:
             if not args.auto_confirm:
                 answer = console.input(f"Reconcile account (diff {diff_sek:.2f} SEK ≤ 150)? [y/N] ").strip().lower()
@@ -246,6 +242,8 @@ def main() -> None:
             console.print(f"[green]✓[/green] Reconciled {count} transaction(s).")
         else:
             console.print(f"[yellow]Skipping reconciliation — difference {diff_sek:.2f} SEK exceeds 150 SEK.[/yellow]")
+    else:
+        console.print(f"\nYNAB cleared balance: {ynab_cleared/1000:.2f} SEK")
 
 
 if __name__ == "__main__":
